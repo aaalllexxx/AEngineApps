@@ -356,7 +356,7 @@ project/
     "debug": false,
     "screen_path": "screens",
     "routes": {
-        "/": "HomeScreen",
+        "/": "HomeScreen"
     }
 }
 ```
