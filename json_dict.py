@@ -2,8 +2,9 @@ import json
 
 
 class JsonDict:
-    def __init__(self, path):
+    def __init__(self, path, encoding="utf-8"):
         self.path = path
+        self.encoding = encoding
         self.dictionary = self.load()
 
     def __getitem__(self, item):
@@ -24,7 +25,7 @@ class JsonDict:
         return list(self.dictionary)
 
     def load(self) -> dict:
-        with open(self.path, "r") as file:
+        with open(self.path, "r", encoding=self.encoding) as file:
             content = file.read()
             if not content:
                 content = "{}"
@@ -37,7 +38,7 @@ class JsonDict:
 
     def push(self, data: dict) -> None:
         data = json.dumps(data, indent=2)
-        with open(self.path, "w") as file:
+        with open(self.path, "w", encoding=self.encoding) as file:
             file.write(data)
 
     def delete_item(self, key: str) -> None:
@@ -45,7 +46,7 @@ class JsonDict:
         del dictionary[key]
         self.push(dictionary)
 
-    def get(self, key: str) -> any | None:
+    def get(self, key: str):
         return self.dictionary.get(key)
 
     def __repr__(self):
