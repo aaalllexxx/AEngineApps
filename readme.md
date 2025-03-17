@@ -292,7 +292,7 @@ print(json_data.get("not_existing_key"))  # output: None
 ```
 
 ## GlobalStorage (global_storage.py)
-> GlobalStorage - класс-singlethon, используемый в качестве глобального хранилища. У всех его объектов один и тот же набор данных, который можно задать самому. Можно импользовать, к примеру, для избежания circular import error
+> GlobalStorage - класс-singlethon, используемый в качестве глобального хранилища. У всех его объектов один и тот же набор данных, который можно задать самому. Можно использовать, к примеру, для избежания circular import error
 
 Пример:
 
