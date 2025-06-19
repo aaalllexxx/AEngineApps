@@ -25,11 +25,13 @@ class App:
         self.config = JsonDict(path, encoding)
     
     def run(self):
+        host = self.config.get("host")
+        port = self.config.get("port")
         if self.config.get("view") != "web":
             self.window = webview.create_window(self.app_name, self.flask)
             webview.start(debug=self.config.get("debug") or False)
         else:
-            self.flask.run()
+            self.flask.run(host, port, debug=self.config.get("debug") or False)
                 
     def close(self):
         if self.window:
