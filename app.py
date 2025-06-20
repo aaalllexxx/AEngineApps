@@ -31,6 +31,7 @@ class App:
             self.window = webview.create_window(self.app_name, self.flask)
             webview.start(debug=self.config.get("debug") or False)
         else:
+            print(f"Running '{self.app_name}' on http://{host}:{port}")
             self.flask.run(host, port, debug=self.config.get("debug") or False)
                 
     def close(self):
