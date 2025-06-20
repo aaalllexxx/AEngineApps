@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from AEngineApps.json_dict import JsonDict
+import netifaces
 from importlib import import_module
 import webview
 
@@ -27,11 +28,17 @@ class App:
     def run(self):
         host = self.config.get("host")
         port = self.config.get("port")
+        interfaces = [] 
+        if host == "0.0.0.0":
+            interfaces = netifaces.interfaces()
         if self.config.get("view") != "web":
             self.window = webview.create_window(self.app_name, self.flask)
             webview.start(debug=self.config.get("debug") or False)
         else:
-            print(f"Running '{self.app_name}' on http://{host}:{port}")
+            for i in interfaces:
+                inter = netifaces.ifaddresses(i)
+                if netifaces.AF_INET in inter:
+                    print(f"Running '{self.app_name}' on http://{inter[netifaces.AF_INET]}:{port}")
             self.flask.run(host, port, debug=self.config.get("debug") or False)
                 
     def close(self):
