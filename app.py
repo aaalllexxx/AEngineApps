@@ -38,7 +38,7 @@ class App:
             for i in interfaces:
                 inter = netifaces.ifaddresses(i)
                 if netifaces.AF_INET in inter:
-                    print(f"Running '{self.app_name}' on http://{inter[netifaces.AF_INET]['addr']}:{port}")
+                    print(f"Running '{self.app_name}' on http://{inter[netifaces.AF_INET][0]['addr']}:{port}")
             self.flask.run(host, port, debug=self.config.get("debug") or False)
                 
     def close(self):
