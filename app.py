@@ -63,7 +63,13 @@ class App:
                     if hasattr(cls, "__options__"):
                         options = cls.__options__
                     call = cls()
-                    self.add_router(route, call, **options)
+                    if isinstance(route, list):
+                        for r in route:
+                            call.__name__ = r.replace("/", "_")
+                            self.add_router(r, call, **options)
+                    else:
+                        call.__name__ = route.replace("/", "_")
+                        self.add_router(route, call, **options)
             if value.get("routers") == "auto":
                 files = os.listdir(self.project_root + value.get("screen_path"))
                 prefix = value["screen_path"].replace("/", ".") + "."
@@ -75,7 +81,13 @@ class App:
                     if hasattr(cls, "__options__"):
                         options = cls.__options__
                     call = cls()
-                    self.add_router(cls.route, call, **options)
+                    if isinstance(cls.route, list):
+                        for r in cls.route:
+                            call.__name__ = r.replace("/", "_")
+                            self.add_router(r, call, **options)
+                    else:
+                        call.__name__ = cls.route.replace("/", "_")
+                        self.add_router(cls.route, call, **options)
 
 
             if value.get("root_path"):
