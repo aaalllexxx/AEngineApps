@@ -1,54 +1,112 @@
+"""
+JsonDict — JSON-файл как Python-объект с автосохранением.
+"""
+
 import json
+from typing import Any, Optional
 
 
 class JsonDict:
-    def __init__(self, path, encoding="utf-8"):
-        self.path = path
-        self.encoding = encoding
-        self.dictionary = self.load()
+    """Класс для работы с JSON как с объектом.
+    
+    При изменении атрибутов значения сохраняются в файл.
+    
+    Пример:
+        data = JsonDict("config.json")
+        data.host = "0.0.0.0"       # автоматически сохраняется
+        print(data.port)             # читает из файла
+        data.save()                  # принудительное сохранение
+    """
 
-    def __getitem__(self, item):
-        self.dictionary = self.load()
-        return self.__getattribute__(item)
+    def __init__(self, path: str, encoding: str = "utf-8"):
+        self.path: str = path
+        self.encoding: str = encoding
+        self._dirty: bool = False
+        self.dictionary: dict = self.load()
 
-    def __setitem__(self, key, value):
+    def __getitem__(self, item: str) -> Any:
+        return self.dictionary.get(item)
+
+    def __setitem__(self, key: str, value: Any) -> None:
         self.__setattr__(key, value)
 
-    def __setattr__(self, key, value):
-        if "dictionary" in list(self.__dict__):
-            if not (key == "dictionary"):
+    def __setattr__(self, key: str, value: Any) -> None:
+        if "dictionary" in self.__dict__:
+            if key not in ("dictionary", "path", "encoding", "_dirty"):
                 self.dictionary[key] = value
-            self.push(self.dictionary)
+                self._dirty = True
+                self._auto_save()
         self.__dict__[key] = value
     
-    def keys(self) -> list:
-        return list(self.dictionary)
+    def _auto_save(self) -> None:
+        """Сохраняет изменения в файл."""
+        if self._dirty:
+            self.push(self.dictionary)
+            self._dirty = False
+    
+    def keys(self) -> list[str]:
+        """Возвращает список ключей."""
+        return list(self.dictionary.keys())
+
+    def values(self) -> list:
+        """Возвращает список значений."""
+        return list(self.dictionary.values())
+
+    def items(self) -> list[tuple[str, Any]]:
+        """Возвращает пары ключ-значение."""
+        return list(self.dictionary.items())
+
+    def has(self, key: str) -> bool:
+        """Проверяет наличие ключа."""
+        return key in self.dictionary
 
     def load(self) -> dict:
-        with open(self.path, "r", encoding=self.encoding) as file:
-            content = file.read()
-            if not content:
-                content = "{}"
-            dictionary = json.loads(content)
+        """Загружает данные из файла."""
+        try:
+            with open(self.path, "r", encoding=self.encoding) as file:
+                content = file.read()
+                if not content:
+                    content = "{}"
+                dictionary = json.loads(content)
+        except (FileNotFoundError, json.JSONDecodeError):
+            dictionary = {}
 
         for k, v in dictionary.items():
-            self.__setattr__(k, v)
+            self.__dict__[k] = v
 
         return dictionary
 
+    def save(self) -> None:
+        """Принудительное сохранение в файл."""
+        self.push(self.dictionary)
+
     def push(self, data: dict) -> None:
-        data = json.dumps(data, indent=2)
+        """Записывает данные в файл."""
+        serialized = json.dumps(data, indent=2, ensure_ascii=False)
         with open(self.path, "w", encoding=self.encoding) as file:
-            file.write(data)
+            file.write(serialized)
 
     def delete_item(self, key: str) -> None:
-        dictionary = self.load()
-        del dictionary[key]
-        self.push(dictionary)
+        """Удаляет ключ из словаря и файла."""
+        if key in self.dictionary:
+            del self.dictionary[key]
+            if key in self.__dict__:
+                del self.__dict__[key]
+            self.push(self.dictionary)
 
-    def get(self, key: str):
-        return self.dictionary.get(key)
+    def get(self, key: str, default: Any = None) -> Any:
+        """Получает значение по ключу с fallback."""
+        return self.dictionary.get(key, default)
 
-    def __repr__(self):
-        self.dictionary = self.load()
-        return json.dumps(self.dictionary, indent=2)
+    def update(self, data: dict) -> None:
+        """Обновляет несколько значений и сохраняет."""
+        self.dictionary.update(data)
+        for k, v in data.items():
+            self.__dict__[k] = v
+        self.push(self.dictionary)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.dictionary
+
+    def __repr__(self) -> str:
+        return json.dumps(self.dictionary, indent=2, ensure_ascii=False)
