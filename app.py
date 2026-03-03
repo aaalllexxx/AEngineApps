@@ -1,7 +1,7 @@
 import os
+import socket
 from flask import Flask
 from AEngineApps.json_dict import JsonDict
-import netifaces
 from importlib import import_module
 import webview
 
@@ -28,19 +28,21 @@ class App:
     def run(self):
         host = self.config.get("host")
         port = self.config.get("port")
-        interfaces = [] 
-        if host == "0.0.0.0":
-            interfaces = netifaces.interfaces()
         if self.config.get("view") != "web":
             self.window = webview.create_window(self.app_name, self.flask)
             webview.start(debug=self.config.get("debug") or False)
         else:
-            for i in interfaces:
-                inter = netifaces.ifaddresses(i)
-                if netifaces.AF_INET in inter:
-                    print(f"Running '{self.app_name}' on http://{inter[netifaces.AF_INET][0]['addr']}:{port}")
-                if host != "0.0.0.0":
-                    print(f"Running '{self.app_name}' on http://{host}:{port}")
+            if host == "0.0.0.0":
+                try:
+                    addrs = set()
+                    for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                        addrs.add(info[4][0])
+                    for addr in addrs:
+                        print(f"Running '{self.app_name}' on http://{addr}:{port}")
+                except socket.gaierror:
+                    print(f"Running '{self.app_name}' on http://0.0.0.0:{port}")
+            else:
+                print(f"Running '{self.app_name}' on http://{host}:{port}")
             self.flask.run(host, port, debug=self.config.get("debug") or False)
                 
     def close(self):
