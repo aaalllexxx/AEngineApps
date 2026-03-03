@@ -35,10 +35,19 @@ class App:
         self.flask.debug = debug
         self.flask.root_path = self.project_root
         self.__config: dict = {}
-        self.window = None
         self._startup_hooks: list[Callable] = []
         self._shutdown_hooks: list[Callable] = []
         self._error_pages: dict[int, Any] = {}
+
+        # ─── Подавление дублирования логов при кластеризации ───
+        if os.environ.get("AENGINE_CLUSTER_PORT"):
+            self._original_stdout = sys.stdout
+            sys.stdout = open(os.devnull, "w")
+            
+            # Также перехватим sys.stderr чтобы заглушить предупреждения инициализации
+            self._original_stderr = sys.stderr
+            sys.stderr = open(os.devnull, "w")
+
     
     # ─── Роутинг ──────────────────────────────────────────────
 
@@ -323,6 +332,14 @@ class App:
 
     def run(self) -> None:
         """Запуск приложения."""
+        # Восстанавливаем stdout/stderr в воркерах перед самым стартом HTTP
+        if getattr(self, "_original_stdout", None) and sys.stdout != getattr(self, "_original_stdout"):
+            sys.stdout.close()
+            sys.stdout = self._original_stdout
+        if getattr(self, "_original_stderr", None) and sys.stderr != getattr(self, "_original_stderr"):
+            sys.stderr.close()
+            sys.stderr = self._original_stderr
+
         host: Optional[str] = self.config.get("host")
         port: Optional[int] = self.config.get("port")
         if not host:
@@ -353,22 +370,36 @@ class App:
     
     def _run_web(self, host: str, port: int) -> None:
         """Запуск в web-режиме."""
-        if host == "0.0.0.0":
-            try:
-                addrs = set()
-                for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-                    addrs.add(info[4][0])
-                for addr in addrs:
-                    print(f"Running '{self.app_name}' on http://{addr}:{port}")
-            except socket.gaierror:
-                print(f"Running '{self.app_name}' on http://0.0.0.0:{port}")
+        role = os.environ.get("AENGINE_CLUSTER_ROLE")
+        is_slave = role == "slave"
+
+        if is_slave:
+            # Для пассивных нод скрываем логгирование Werkzeug и баннеры Flask
+            import logging
+            logging.getLogger("werkzeug").disabled = True
+            cli = sys.modules.get("flask.cli")
+            if cli:
+                cli.show_server_banner = lambda *args, **kwargs: None
         else:
-            print(f"Running '{self.app_name}' on http://{host}:{port}")
+            if host == "0.0.0.0":
+                try:
+                    addrs = set()
+                    for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                        addrs.add(info[4][0])
+                    for addr in addrs:
+                        print(f"Running '{self.app_name}' on http://{addr}:{port}")
+                except socket.gaierror:
+                    print(f"Running '{self.app_name}' on http://0.0.0.0:{port}")
+            else:
+                print(f"Running '{self.app_name}' on http://{host}:{port}")
+
         try:
             self.flask.run(host, port, debug=self.config.get("debug") or False)
         except OSError as e:
-            print(f"[App] Ошибка запуска сервера: {e}")
-            print(f"[App] Возможно, порт {port} уже занят.")
+            if not is_slave:
+                print(f"[App] Ошибка запуска сервера: {e}")
+                print(f"[App] Возможно, порт {port} уже занят.")
+
 
     def close(self) -> None:
         """Закрывает окно webview."""
