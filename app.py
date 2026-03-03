@@ -128,22 +128,6 @@ class App:
         """
         self.flask.after_request(func)
 
-    # ─── CORS ─────────────────────────────────────────────────
-
-    def enable_cors(self, origins: str = "*", methods: str = "GET,POST,PUT,DELETE,OPTIONS",
-                    headers: str = "Content-Type,Authorization") -> None:
-        """Включает CORS для API-режима.
-        
-        Пример:
-            app.enable_cors()
-            app.enable_cors(origins="https://mysite.com")
-        """
-        @self.flask.after_request
-        def cors_headers(response):
-            response.headers["Access-Control-Allow-Origin"] = origins
-            response.headers["Access-Control-Allow-Methods"] = methods
-            response.headers["Access-Control-Allow-Headers"] = headers
-            return response
 
     # ─── Страницы ошибок ──────────────────────────────────────
 
