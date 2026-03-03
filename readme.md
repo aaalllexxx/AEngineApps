@@ -1,445 +1,278 @@
-# AEngineApps
-> AEngineApps - модуль, предназначенный для написания webview приложений.
-Модуль написан на основе Flask и pywebview.
+# AEngineApps v2.0 (OOP Framework)
 
-## App (app.py)
-> App - класс приложения. Вы можете использовать его как основное приложение, а можете наследовать от него свой класс приложения.
+> AEngineApps — это легковесный, чисто объектно-ориентированный фреймворк для создания webview (десктопных) и web-приложений на Python.
+Построен поверх Flask и pywebview. Отличается полным отказом от декораторов в пользу строгой архитектуры классов и понятного API.
 
-Пример:
+---
 
-```python
-from AEngineApps.app import App
+## 🚀 Быстрый старт (Quick Start)
 
-app = App("My first app")
-if __name__ == "__main__":
-    app.run()
+### Структура проекта
+```text
+project/
+    static/              # картинки, css, js
+    templates/           # html шаблоны
+    screens/             # файлы с экранами (логикой)
+    main.py              # точка входа
+    config.json          # конфигурация
 ```
 
-### App.add_router(path, view_func, **options)
-> add_router - метод, добавляющий в приложение страницу по пути
-
-    Аргументы:
-
-        path: str - путь, по которому будет доступна страница
-
-        view_func: callable - фунция, возвращающая контент страницы
-        
-        **options - опции, влияющие на функцию (к примеру methods=["GET, POST"]) 
-Пример:
-
-```python
-from AEngineApps.app import App
-
-def hello_world():
-    return "hello world!"
-
-app = App("My first app")
-app.add_router("/", hello_world)
-if __name__ == "__main__":
-    app.run()
+### 1. `config.json`
+```json
+{
+    "debug": true,
+    "view": "web",
+    "screen_path": "screens",
+    "routers": "auto"
+}
 ```
 
-### App.add_routers(rules)
-> add_routers - метод добавляющий страницы и пути, представленные в словаре
-
-    Аргументы:
-
-        rules: dict[str, callable] - словарь, в котором в качестве ключа выступает путь, а в качестве значения - функция
-
-Пример:
+### 2. `main.py`
 ```python
 from AEngineApps.app import App
 
-def first():
-    return "<a href='/next'>Go to next screen</a>"
-
-def second():
-    return "<a href='/'>Go to previous screen</a>"
-
-app = App("My first app")
-app.add_router("/", hello_world)
-app.add_router("/next", second)
-
-if __name__ == "__main__":
-    app.run()
-```
-### App.load_config(path)
-> load_config - загрузка конфигураций из файла конфигурации
-
-    Аргументы:
-
-        path: str - Путь до файла конфигураций
-
-Пример:
-
-```python
-# main.py
-from AEngineApps.app import App
-
-app = App("My first app")
+app = App("MyApp")
 app.load_config("config.json")
 
 if __name__ == "__main__":
     app.run()
 ```
 
-```json
-// config.json
-{
-    "debug": false,
-    "screen_path": "screens",
-    "routes": {
-        "/": "HomeScreen",
-        "/news": "NewsScreen",
-        "/chat/<int:identifier>": "ChatScreen"
-    }
-}
-
-```
-
-## JsonDict (json_dict.py)
-> JsonDict - класс для работы с json как с объектом javascript. При подгрузке json документа его значения подгружаются как атрибуты класса, а при изменении значений атрибутов значения изменяются и в самом файле
-
-    Аргументы при инициализации:
-        path: str - путь до файла json
-
-Пример:
-
-### json до работы с ним
-
-```json
-// data.json до выполнения кода
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-
-### Чтение данных в файле
-
+### 3. `screens/home.py`
 ```python
-# Чтение данных в файле
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-print(json_data.apples) # output: 5
-```
-
-### Запись данных в файл
-
-```python
-# Запись данных в файл
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-json_data.apples = 15
-```
-### data.json после выполнения кода
-```json
-// data.json после выполнения кода
-{
-    "apples": 15,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-
-### Методы:
-### JsonDict.keys()
-> keys - метод, возвращающий ключи внутри JsonDict
-
-Пример:
-```json
-// data.json
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-
-```python
-# Метод keys
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-print(json_data.keys()) 
-
-# output: ["apples", "pears", "lemons", "other_products"]
-```
-### JsonDict.load()
-
-> load() - метод, подгружающий данные в объект JsonDict и возвращает словарь полученный из json файла
-
-Пример:
-```json
-// data.json
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-
-```python
-# Метод load
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-print(json_data.load()) 
-```
-
-    output: 
-        {
-            "apples": 5,
-            "pears": 10,
-            "lemons": 25,
-            "other_products": ["tea", "coffee", "lemonade"]
-        }
-> в объект json_data данные также подгрузились и сохранились
-
-### JsonDict.push(data)
-
-    Аргументы:
-        data - словарь с данными, которые надо записать в файл
-
-Пример:
-
-```json
-// data.json до выполнения кода
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-```python
-# Метод push
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-json_data.push({"data": "data"}) 
-```
-```json
-// data.json после выполнения кода
-{
-    "data": "data"
-}
-```
-
-### JsonDict.delete_item(key)
-> delete_item - метод удаляющий значение по ключу (в том числе из файла)
-
-    Аргументы:
-        key: str - ключ, по которому нужно удалить значение
-
-Пример:
-
-```json
-// data.json до выполнения кода
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-```python
-# Метод delete_item
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-json_data.delete_item("apples")
-```
-
-```json
-// data.json после выполнения кода
-{
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-
-### JsonDict.get(key)
-> get - метод, который получает значение по ключу и, если его не существует, то возвращает None
-
-    Аргументы:
-        key: str
-    
-```json
-// data.json до выполнения кода
-{
-    "apples": 5,
-    "pears": 10,
-    "lemons": 25,
-    "other_products": ["tea", "coffee", "lemonade"]
-}
-```
-```python
-# Метод get
-from AEngineApps.json_dict import JsonDict
-
-json_data = JsonDict("data.json")
-print(json_data.get("apples"))  # output: 5
-print(json_data.get("not_existing_key"))  # output: None
-```
-
-## GlobalStorage (global_storage.py)
-> GlobalStorage - класс-singlethon, используемый в качестве глобального хранилища. У всех его объектов один и тот же набор данных, который можно задать самому. Можно использовать, к примеру, для избежания circular import error
-
-Пример:
-
-```python
-# file1.py
-from AEngineApps.global_storage import GlobalStorage
-gs = GlobalStorage()
-gs.some_data = 1
-```
-
-```python
-# file2.py
-from AEngineApps.global_storage import GlobalStorage
-gs = GlobalStorage()
-print(gs.some_data)  # output: 1
-```
-
-## Screen
-> Screen - класс, от которого должны наследоваться все классы экрана. Экран - то, что отображается на определённой странице приложения. Он должен содержать метод run, который должен возвращать ответ, отображаемый на странице.
-
-Примеры:
-```python
-# file1.py
 from AEngineApps.screen import Screen
 
 class HomeScreen(Screen):
-    def run(self, *args, **kwargs):
-        return "It is my home screen"
-```
-
-# Quick start
-## Структура проекта
-```python
-project/
-    AEngineApps/
-        "Файлы модуля"
-        ...
-    static/
-        "статические файлы, как картинки, css или js"
-        ...
-    templates/
-        "html файлы"
-        index.html
-    screens/
-        "Все файлы с экранами"
-        HomeScreen.py
-    main.py
-    config.json
-```
-
-### config.json
-> config.json - Файл, описывающий конфигурацию проекта.
-в ней мы пропишем то что:
-1) Режим дебаггинга("debug") у нас будет выключен
-2) Путь, по которому будут искаться экраны ("screen_path") - "screens"
-3) Роуты, которые есть в приложении:
-    - "/" будет переводить на "HomeScreen"
-```json
-// config.json
-{
-    "debug": false,
-    "screen_path": "screens",
-    "routes": {
-        "/": "HomeScreen"
-    }
-}
-```
-
-### main.py
-
-> main.py - файл, в котором прописан код приложения.
-Здесь мы 
-1) Объявляем класс приложения
-2) Загружаем в него конфигурации из файла
-3) Создаем экземпляр класса
-4) Запускаем приложение
-
-```python
-# main.py
-from AEngineApps.app import App
-
-class MyApp(App):
-    def __init__(self):
-        self.load_config("config.json")
+    route = "/"
+    methods = ["GET", "POST"]
     
-if __name__ == "__main__":
-    app = MyApp()
-    app.run()
-```
-### screens/HomeScreen.py
-
-> HomeScreen.py - файл с домашним экраном. Здесь мы:
-1) Импортируем класс экрана и flask.render_template
-2) Объявляем класс HomeScreen (класс должен быть назван точно так же как и файл)
-3) Объявляем в нём метод run, который отвечает за отображение экрана
-
-```python
-# HomeScreen.py
-from AEngineApps.screen import Screen
-from flask import render_template
-
-class HomeScreen(Screen):
     def run(self):
-        return render_template("index.html")
-
+        if self.request.method == "POST":
+            return self.json({"status": "success"})
+        return self.render("index.html", title="Главная")
 ```
 
-### index.html
+---
 
-> index.html - файл, отображаемый на экране. 
-Здесь стандартный код, только в body прописываем "Hello world!"
+## 📘 Документация: `App`
 
-```html
-<!-- index.html -->
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document</title>
-    </head>
-    <body>
-        <h1>Hello world!</h1>
-    </body>
-</html>
+Основой класс приложения. Все настройки и запуски происходят через него.
+
+### Инициализация
+```python
+app = App(app_name="AEngineApp", debug=False)
 ```
-### Запуск приложения
 
-> Для запуска приложения - запустите файл main.py
+### Методы маршрутизации
+| Метод | Описание | Пример |
+|---|---|---|
+| `add_screen(path, ScreenClass)` | Привязывает класс-экран к URL пути. | `app.add_screen("/", Home)` |
+| `add_screens(rules_dict)` | Регистрация нескольких экранов сразу. | `app.add_screens({"/": Home, "/api": Api})` |
+| `add_router(path, view_func)` | Привязывает обычную функцию (legacy). | `app.add_router("/old", my_func)` |
+| `add_routers(rules_dict)` | Массовая регистрация функций. | `app.add_routers({"/old": my_func})` |
 
+### Middleware и Lifecycle
+| Метод | Описание | Пример |
+|---|---|---|
+| `before_request(func)` | Функция вызывается **до** каждого HTTP запроса. Если вернёт ответ, запрос прерывается. | `app.before_request(check_auth)` |
+| `after_request(func)` | Вызывается **после** каждого запроса. Должна вернуть изменённый response. | `app.after_request(add_cors)` |
 
-# Конфигурации приложения
+### События жизненного цикла (Lifecycle)
+```python
+def check_auth():
+    if not is_authorized():
+        app.redirect("/login")
 
-> Конфигурировать приложение можно как через менеджер проектов apm (apm config), либо вручную
+# Вызывается ДО каждого запроса
+app.before_request(check_auth)
 
-### Ключи config.json
+# Функция при старте приложения
+app.on_start(db.connect)
+```
+| Метод | Описание | Пример |
+|---|---|---|
+| `on_start(func)` | Функция выполнится один раз перед стартом сервера. | `app.on_start(db.connect)` |
+| `on_stop(func)` | Функция выполнится при завершении работы приложения. | `app.on_stop(db.close)` |
 
-> debug: bool - Режим отладки приложения
+### Настройки безопасности и ошибок
+| Метод | Описание | Пример |
+|---|---|---|
+| `enable_cors(orig, meth, head)`| Включает CORS. По умолчанию разрешает всё. | `app.enable_cors(origins="*")` |
+| `set_error_page(code, ScreenCls)`| Заменяет стандартную страницу ошибки 404/500 на ваш класс Screen. | `app.set_error_page(404, NotFoundScreen)`|
+
+### Управление приложением
+| Метод | Описание | Пример |
+|---|---|---|
+| `load_config(path, encoding)` | Читает JSON-конфигурацию. Настраивает авто-роутинг и папки static/templates. | `app.load_config("config.json")` |
+| `run()` | Запускает приложение (в webview или web режиме в зависимости от конфига). | `app.run()` |
+| `close()` | Принудительно закрывает окно webview (если оно открыто). | `app.close()` |
 
 ---
 
-> view: app | web - Режим отображения, web = web-приложение, app = webview приложение
+## 📗 Документация: `Screen`
+
+Базовый класс для каждого контроллера/страницы. В одном `.py` файле может быть **сколько угодно экранов** — авто-роутинг найдет их все.
+
+### Атрибуты класса
+| Атрибут | Описание | Пример |
+|---|---|---|
+| `route` | Обязательный. Указывает `URL` для авто-роутинга. | `route = "/login"` |
+| `methods` | Опциональный. Указывает разрешенные HTTP методы. | `methods = ["GET", "POST"]` |
+
+### Основной метод `run`
+Вы **обязаны** переопределить метод `run(*args, **kwargs)` во всех наследниках `Screen`.
+```python
+class PostScreen(Screen):
+    route = "/post/<int:id>"
+    
+    def run(self, id):
+        product = db.get(id)
+        return self.render("post.html", product=product)
+```
+
+### Встроенные помощники (Хелперы)
+| Формат Вызова | Описание |
+|---|---|
+| `self.render("file.html", **ctx)` | Возвращает скомпилированный HTML-шаблон (аналог `render_template`). |
+| `self.redirect("/url")` | Перенаправляет пользователя на другой адрес (аналог `redirect`). |
+| `self.json(dict_data, status=200)`| Возвращает JSON-ответ (аналог `jsonify`). |
+| `self.request` | Свойство. Даёт прямой доступ к `flask.request` (form, args, json, headers). |
+| `self.app` | Свойство. Даёт доступ к экземпляру текущего `App` (например, для доступа к `self.app.config`). |
+| `self.session` | Свойство. Обертка над `flask.session` (требует SECRET_KEY). |
+| `self.client_ip` | Свойство. Безопасное получение IP пользователя (с поддержкой прокси). |
+| `self.abort(404)` | Мгновенное прерывание запроса с ошибкой. |
+| `self.flash("msg", "type")` | Показ одноразовых сообщений (Flash messages). |
+| `self.save_file("avatar", "path")`| Сохранение загруженного файла (возвращает `True/False`). |
 
 ---
 
-> screen_path: str - Путь до папки с экранами
+## � REST API: класс `API` (api.py)
+
+Специальная обертка над `Screen` для максимально быстрого и элегантного создания REST API.
+Забудьте про `if request.method == "POST"` и ручной `jsonify`.
+
+### Особенности `API` класса:
+1. Автоматически перенаправляет запросы в методы по названию HTTP (`get`, `post`, `put`, `delete`).
+2. Любой возвращаемый `dict` или `list` **автоматически превращается в JSON**.
+3. Можно возвращать кортеж `(dict, status_code)`.
+
+### Хелперы:
+| Формат Вызова | Описание |
+|---|---|
+| `self.require_keys(["name"])` | Проверяет JSON-запрос. Возвращает `(True, "")` или `(False, 'name')`. |
+| `self.get_arg("limit", int, 10)`| Безопасное получение и автокаст Query (?limit=5) параметра. |
+
+```python
+# screens/api_screens.py
+from AEngineApps.api import API
+
+class UsersAPI(API):
+    route = "/api/users"
+    methods = ["GET", "POST"]
+    
+    def get(self):
+        # /api/users?limit=5
+        limit = self.get_arg("limit", type_func=int, default=10)
+        return {"users": ["Alex", "John", "Sarah"][:limit]}
+        
+    def post(self):
+        ok, missing = self.require_keys(["name", "age"])
+        if not ok:
+             return {"error": f"Missing key: {missing}"}, 400
+            
+        # Возвращаем dict + HTTP статус (201 Created)
+        return {"status": "created"}, 201
+```
 
 ---
 
-> routers: auto | dict[route: screen name] - Роуты приложения, в случае если выбран автоматический режим, все файлы в screen_path будут определяться как screen, и класс экрана внутри должен содержать параметр route, в котором должен быть указан путь до экрана на сервере
+## 🧩 Мультисервисная Архитектура: класс `Service` (service.py)
+
+Легковесный способ разбить монолит на модули (микросервисы).
+`Service` — это обертка над Flask Blueprints, полностью интегрированная с `Screen` и `API`.
+
+### Изолированные сервисы
+У каждого сервиса может быть свой префикс URL, свои экраны и **свои независимые middleware**!
+
+```python
+# services/auth.py
+from AEngineApps.service import Service
+from AEngineApps.api import API
+
+auth = Service("auth", prefix="/api/auth")
+
+class LoginAPI(API):
+    methods = ["POST"]
+    def post(self):
+        return {"status": "success", "token": "123"}
+
+auth.add_screen("/login", LoginAPI)
+
+# Middleware ТОЛЬКО для экранов Auth-сервиса
+@auth.before_request
+def check_attempts():
+    pass
+```
+
+### Подключение сервиса в `main.py`
+```python
+from AEngineApps.app import App
+from services.auth import auth
+
+app = App()
+app.register_service(auth)
+# Теперь LoginAPI доступен по адресу /api/auth/login
+```
+
+---
+
+## 📙 Документация: `GlobalStorage`
+
+Безопасное глобальное хранилище-одиночка (Singleton). Идеально подходит для обмена данными между модулями, избегая циклических импортов (`Circular Import`).
+
+```python
+from AEngineApps.global_storage import GlobalStorage
+gs = GlobalStorage()
+```
+
+| Метод / Синтаксис | Описание | Пример |
+|---|---|---|
+| `gs.key = value` | Запись данных через атрибут. | `gs.user_id = 42` |
+| `gs.key` | Получение данных через атрибут (выдаст `AttributeError` если нет). | `print(gs.user_id)` |
+| `gs.get(key, default)`| Безопасное получение с дефолтным значением. | `user = gs.get("user_id", None)` |
+| `gs.has(key)` | Проверка существования ключа (возвращает bool). | `if gs.has("user_id"):` |
+| `gs.delete(key)` | Удаление ключа. | `gs.delete("user_id")` |
+| `gs.clear()` | Полная очистка хранилища. | `gs.clear()` |
+| `gs.all()` | Получение всех данных в виде словаря (`dict`). | `config = gs.all()` |
+
+---
+
+## 📕 Документация: `JsonDict`
+
+Удобная обертка над JSON-файлом. Позволяет работать с данными как с объектами Python. Изменения автоматически или ручным вызовом сохраняются на диск.
+
+```python
+from AEngineApps.json_dict import JsonDict
+data = JsonDict("data.json")
+```
+
+| Метод / Синтаксис | Описание | Пример |
+|---|---|---|
+| `data.key = value` | Обновляет значение и ставит отметку об изменении. | `data.port = 8080` |
+| `data.key` | Чтение значения (выдаст `AttributeError` если нет). | `print(data.port)` |
+| `data.has(key)` | Возвращает `True`, если ключ есть в JSON. | `if data.has("port"):` |
+| `"key" in data` | Аналог `has()`, поддержка оператора `in`. | `if "port" in data:` |
+| `data.get(key)` | Безопасное получение (вернёт `None`, если нет). | `port = data.get("port")` |
+| `data.update(dict)` | Массовое обновление ключей из словаря. | `data.update({"a": 1, "b": 2})` |
+| `data.delete_item(key)`| Удаление ключа из JSON. | `data.delete_item("port")` |
+| `data.keys()` | Возвращает список всех ключей. | `for k in data.keys():` |
+| `data.values()` | Возвращает список всех значений. | `for v in data.values():` |
+| `data.items()` | Возвращает пары `(ключ, значение)`. | `for k, v in data.items():` |
+| `data.save()` | Принудительная запись на диск (автовызывается при `load`). | `data.save()` |
+| `data.load()` | Принудительная перезагрузка файла с диска (обновляет кэш). | `data.load()` |
+| `data.push(dict)` | Заменяет **ВЕСЬ** файл переданным словарём. | `data.push({"new": "data"})` |
+
+*Особенности `JsonDict` v2.0:*
+- Не падает при отсутствии файла (`FileNotFoundError` обрабатывается, создается пустой словарь).
+- Флаг `ensure_ascii=False` гарантирует корректное отображение русских букв в файле (не в виде `\u0430...`).
+- Ленивое сохранение: данные пишутся на диск только если были реально изменены (флаг `_dirty`).

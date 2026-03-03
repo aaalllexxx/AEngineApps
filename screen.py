@@ -4,7 +4,8 @@ Screen — базовый класс экрана AEngineApps.
 """
 
 from typing import Any, Optional
-from flask import render_template, redirect as flask_redirect, jsonify, request, url_for
+from flask import render_template, redirect as flask_redirect, jsonify, request, url_for, session, flash, abort
+import os
 
 
 class Screen:
@@ -81,3 +82,49 @@ class Screen:
     def app(self):
         """Ссылка на экземпляр App (устанавливается автоматически)."""
         return self._app
+
+    @property
+    def session(self):
+        """Доступ к сессии (работает как dict).
+        
+        Требует заданного SECRET_KEY в конфигурации Flask.
+        """
+        return session
+        
+    def abort(self, code: int, *args, **kwargs):
+        """Мгновенно прерывает запрос с кодом ошибки.
+        
+        Пример:
+            self.abort(404)
+        """
+        abort(code, *args, **kwargs)
+
+    def flash(self, message: str, category: str = "message"):
+        """Показывает флеш-сообщение пользователю (Flash messages).
+        
+        Пример:
+            self.flash("Успешно сохранено!", "success")
+        """
+        flash(message, category)
+
+    @property
+    def client_ip(self) -> str:
+        """Безопасное получение IP-адреса пользователя (через прокси или напрямую)."""
+        forwarded = self.request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        return self.request.remote_addr or "127.0.0.1"
+
+    def save_file(self, field_name: str, save_path: str) -> bool:
+        """Удобное сохранение загруженного через POST-форму файла.
+        
+        Пример:
+            if self.save_file("avatar", "static/avatars/user_1.png"):
+                print("Успешно загружено")
+        """
+        file = self.request.files.get(field_name)
+        if file and file.filename != "":
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            file.save(save_path)
+            return True
+        return False

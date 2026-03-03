@@ -81,33 +81,50 @@ class App:
         for route, func in rules.items():
             self.add_router(route, func)
 
+    # ─── Сервисы (Мультисервисная архитектура) ────────────────
+    
+    def register_service(self, service: Any) -> None:
+        """Подключение отдельного Service (микросервиса / модуля).
+        
+        Пример:
+            auth_service = Service("auth", prefix="/api/auth")
+            auth_service.add_screen("/login", LoginAPI)
+            
+            app.register_service(auth_service)
+        """
+        # Инжектим ссылку на приложение во все экраны сервиса
+        for screen in service._screens:
+            screen._app = self
+            
+        self.flask.register_blueprint(service.blueprint)
+
     # ─── Middleware ────────────────────────────────────────────
 
-    def add_middleware(self, func: Callable) -> None:
-        """Добавляет middleware, вызываемый ДО каждого запроса.
+    def before_request(self, func: Callable) -> None:
+        """Регистрирует функцию, выполняемую ДО каждого запроса.
         
-        Если middleware возвращает Response — запрос прерывается.
+        Если функция возвращает Response (например, redirect), запрос прерывается.
         
         Пример:
             def check_auth():
                 if not session.get("user"):
                     return redirect("/login")
             
-            app.add_middleware(check_auth)
+            app.before_request(check_auth)
         """
         self.flask.before_request(func)
 
-    def add_after_middleware(self, func: Callable) -> None:
-        """Добавляет middleware, вызываемый ПОСЛЕ каждого запроса.
+    def after_request(self, func: Callable) -> None:
+        """Регистрирует функцию, выполняемую ПОСЛЕ каждого запроса.
         
-        Middleware принимает response и должен вернуть response.
+        Функция обязана принимать объект response и возвращать его.
         
         Пример:
             def add_headers(response):
                 response.headers["X-App"] = "AEngine"
                 return response
             
-            app.add_after_middleware(add_headers)
+            app.after_request(add_headers)
         """
         self.flask.after_request(func)
 

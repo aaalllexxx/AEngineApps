@@ -1,5 +1,17 @@
 # Changelog — AEngineApps v2.0
 
+## [2.0.2] — 2026-03-03
+### Новые классы и методы
+- **Класс `Service` (`service.py`)** — легковесная мультисервисная архитектура (обертка над Blueprints) для разбиения монолита. Поддерживает свои экраны, свой префикс и свои изолированные middleware. Подключается через `app.register_service()`.
+- **Класс `API` (`api.py`)** — обёртка над `Screen` для элегантного REST API (авто-роутинг по `get/post`, конвертация в JSON). 
+  - Методы: `self.require_keys(keys)`, `self.get_arg("key", type, default)`
+- Новые хелперы в **классе `Screen`**:
+  - `self.session`, `self.client_ip` (проперти)
+  - `self.abort(code)`, `self.flash(msg)`, `self.save_file("field", "path")`
+
+### Документация
+- Полностью переписан `readme.md` под новую версию v2.0 (добавлены инструкции по `add_screen`, `add_middleware`, обновлен Quick Start и описание `GlobalStorage`/`JsonDict`)
+
 ## [2.0.0] — 2026-03-03
 
 ### Архитектура
@@ -9,8 +21,8 @@
 ### App — новые методы
 - `add_screen(path, ScreenClass)` — регистрация экрана по маршруту
 - `add_screens(dict)` — массовая регистрация
-- `add_middleware(func)` — middleware до запроса
-- `add_after_middleware(func)` — middleware после запроса
+- `before_request(func)` — middleware до запроса (вместо add_middleware)
+- `after_request(func)` — middleware после запроса (вместо add_after_middleware)
 - `set_error_page(code, ScreenClass)` — страницы ошибок через Screen-классы
 - `on_start(func)` / `on_stop(func)` — lifecycle хуки (без декораторов)
 - `enable_cors()` — включение CORS одной строкой
