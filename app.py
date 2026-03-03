@@ -252,11 +252,50 @@ class App:
 
             if value.get("root_path"):
                 self.flask.root_path = value["root_path"]
+                
+            # Авто-поиск сервисов (микросервисов)
+            if value.get("services") == "auto":
+                self._auto_discover_services(value.get("services_path", "services"))
+                
             for prop, val in value.items():       
                 self.__config[prop] = val
         
         elif isinstance(value, JsonDict):
             self.config = value.dictionary
+
+    def _auto_discover_services(self, services_path: str) -> None:
+        """Автоматическое обнаружение и регистрация объектов Service.
+        
+        Ищет все экземпляры класса Service внутри директории `services_path`.
+        """
+        from AEngineApps.service import Service
+        services_dir = os.path.join(self.project_root, services_path)
+        
+        if not os.path.isdir(services_dir):
+            print(f"[App] Директория сервисов не найдена: {services_dir}")
+            return
+            
+        prefix = services_path.replace("/", ".").replace("\\", ".") + "."
+        
+        for filename in os.listdir(services_dir):
+            if filename.startswith("__") or not filename.endswith(".py"):
+                continue
+                
+            mod_name = filename.replace(".py", "")
+            try:
+                module = import_module(prefix + mod_name)
+            except ImportError as e:
+                print(f"[App] Ошибка импорта сервиса '{mod_name}': {e}")
+                continue
+                
+            # Ищем конкретные экземпляры класса Service в модуле
+            for name, obj in inspect.getmembers(module):
+                if isinstance(obj, Service):
+                    try:
+                        self.register_service(obj)
+                        print(f"[App] Сервис '{obj.name}' (префикс {obj.prefix}) автоматически зарегистрирован.")
+                    except Exception as e:
+                        print(f"[App] Ошибка регистрации сервиса '{obj.name}': {e}")
 
     def _auto_discover_screens(self, screen_path: str) -> None:
         """Автообнаружение ВСЕХ Screen-классов во всех файлах screen_path.

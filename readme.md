@@ -224,6 +224,19 @@ app.register_service(auth)
 # Теперь LoginAPI доступен по адресу /api/auth/login
 ```
 
+### Автоматическое подключение сервисов через `config.json`
+Вы можете сделать архитектуру полностью автоматической ("Plug & Play"). Укажите в вашем `config.json` параметр `"services": "auto"`, и AEngineApps автоматически найдет и подключит все сервисы в папке проекта.
+
+```json
+{
+  "host": "127.0.0.1",
+  "port": 5000,
+  "services": "auto",
+  "services_path": "services" 
+}
+```
+*Примечание: `services_path` по умолчанию равен "services", указывать его необязательно.*
+
 ---
 
 ## 📙 Документация: `GlobalStorage`
