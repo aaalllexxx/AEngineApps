@@ -1,28 +1,25 @@
 """
-AEngineApps — OOP-фреймворк для создания webview/web приложений.
-Построен на Flask + pywebview. Без декораторов — чистый ООП.
+AEngineApps - OOP framework for building webview/web apps.
+Built on top of Flask + pywebview without decorator-heavy APIs.
 """
 
-import os
-import sys
-import socket
 import inspect
-from typing import Callable, Any, Optional
+import os
+import socket
+import sys
+from collections.abc import Iterable
+from importlib import import_module
+from typing import Any, Callable, Optional
+
+import webview
 from flask import Flask, make_response
+
 from AEngineApps.json_dict import JsonDict
 from AEngineApps.screen import Screen
-from importlib import import_module
-import webview
 
 
 class App:
-    """Основной класс приложения AEngine.
-    
-    Пример:
-        app = App("MyApp")
-        app.load_config("config.json")
-        app.run()
-    """
+    """Main AEngine application class."""
 
     def __init__(self, app_name: str = __name__, debug: bool = False):
         self.app_name: str = app_name
@@ -30,7 +27,7 @@ class App:
         self.flask: Flask = Flask(
             self.app_name,
             static_folder=os.path.join(self.project_root, "static"),
-            template_folder=os.path.join(self.project_root, "templates")
+            template_folder=os.path.join(self.project_root, "templates"),
         )
         self.flask.debug = debug
         self.flask.root_path = self.project_root
@@ -38,161 +35,77 @@ class App:
         self._startup_hooks: list[Callable] = []
         self._shutdown_hooks: list[Callable] = []
         self._error_pages: dict[int, Any] = {}
+        self.window = None
 
-        # ─── Подавление дублирования логов при кластеризации ───
+        # Suppress duplicate logs in clustered worker processes.
         if os.environ.get("AENGINE_CLUSTER_PORT"):
             self._original_stdout = sys.stdout
             sys.stdout = open(os.devnull, "w")
-            
-            # Также перехватим sys.stderr чтобы заглушить предупреждения инициализации
             self._original_stderr = sys.stderr
             sys.stderr = open(os.devnull, "w")
 
-    
-    # ─── Роутинг ──────────────────────────────────────────────
-
     def add_screen(self, path: str, screen_cls: type, **options) -> None:
-        """Добавляет экран по маршруту.
-        
-        Пример:
-            app.add_screen("/", HomeScreen)
-            app.add_screen("/profile", ProfileScreen, methods=["GET", "POST"])
-        """
+        """Register a screen class under a route."""
         instance = screen_cls()
         instance._app = self
         instance.__name__ = path.replace("/", "_") or "_root"
-        
-        # Берём methods из класса, если не переданы явно
+
         if "methods" not in options and hasattr(screen_cls, "methods"):
             options["methods"] = screen_cls.methods
-        
+
         self.flask.add_url_rule(path, view_func=instance, **options)
 
     def add_screens(self, rules: dict[str, type]) -> None:
-        """Добавляет несколько экранов из словаря {путь: ScreenClass}.
-        
-        Пример:
-            app.add_screens({
-                "/": HomeScreen,
-                "/about": AboutScreen,
-                "/api/data": DataScreen
-            })
-        """
         for route, screen_cls in rules.items():
             self.add_screen(route, screen_cls)
 
     def add_router(self, path: str, view_func: Callable, **options) -> None:
-        """Добавляет маршрут с функцией (совместимость)."""
         self.flask.add_url_rule(path, view_func=view_func, **options)
-        
+
     def add_routers(self, rules: dict[str, Callable]) -> None:
-        """Добавляет несколько маршрутов из словаря (совместимость)."""
         for route, func in rules.items():
             self.add_router(route, func)
 
-    # ─── Сервисы (Мультисервисная архитектура) ────────────────
-    
     def register_service(self, service: Any) -> None:
-        """Подключение отдельного Service (микросервиса / модуля).
-        
-        Пример:
-            auth_service = Service("auth", prefix="/api/auth")
-            auth_service.add_screen("/login", LoginAPI)
-            
-            app.register_service(auth_service)
-        """
-        # Инжектим ссылку на приложение во все экраны сервиса
+        """Attach a Service instance to the app."""
         for screen in service._screens:
             screen._app = self
-            
+
         self.flask.register_blueprint(service.blueprint)
 
-    # ─── Middleware ────────────────────────────────────────────
-
     def before_request(self, func: Callable) -> None:
-        """Регистрирует функцию, выполняемую ДО каждого запроса.
-        
-        Если функция возвращает Response (например, redirect), запрос прерывается.
-        
-        Пример:
-            def check_auth():
-                if not session.get("user"):
-                    return redirect("/login")
-            
-            app.before_request(check_auth)
-        """
         self.flask.before_request(func)
 
     def after_request(self, func: Callable) -> None:
-        """Регистрирует функцию, выполняемую ПОСЛЕ каждого запроса.
-        
-        Функция обязана принимать объект response и возвращать его.
-        
-        Пример:
-            def add_headers(response):
-                response.headers["X-App"] = "AEngine"
-                return response
-            
-            app.after_request(add_headers)
-        """
         self.flask.after_request(func)
 
-
-    # ─── Страницы ошибок ──────────────────────────────────────
-
     def set_error_page(self, code: int, screen_cls: type) -> None:
-        """Устанавливает экран для страницы ошибки.
-        
-        Пример:
-            class NotFoundPage(Screen):
-                def run(self, error=None):
-                    return self.render("404.html"), 404
-            
-            app.set_error_page(404, NotFoundPage)
-        """
         instance = screen_cls()
         instance._app = self
         self.flask.register_error_handler(code, instance)
 
     def _register_default_error_handlers(self) -> None:
-        """Стандартные страницы ошибок (если не заданы пользователем)."""
         @self.flask.errorhandler(404)
         def _default_404(e):
             return make_response(
                 "<html><body style='font-family:sans-serif;text-align:center;padding:60px'>"
                 "<h1>404</h1><p>Страница не найдена</p>"
-                "<a href='/'>На главную</a></body></html>", 404
+                "<a href='/'>На главную</a></body></html>",
+                404,
             )
 
         @self.flask.errorhandler(500)
         def _default_500(e):
             return make_response(
                 "<html><body style='font-family:sans-serif;text-align:center;padding:60px'>"
-                "<h1>500</h1><p>Внутренняя ошибка сервера</p></body></html>", 500
+                "<h1>500</h1><p>Внутренняя ошибка сервера</p></body></html>",
+                500,
             )
 
-    # ─── Lifecycle ────────────────────────────────────────────
-
     def on_start(self, func: Callable) -> None:
-        """Регистрирует функцию, вызываемую при запуске.
-        
-        Пример:
-            def connect_db():
-                db.connect()
-            
-            app.on_start(connect_db)
-        """
         self._startup_hooks.append(func)
 
     def on_stop(self, func: Callable) -> None:
-        """Регистрирует функцию, вызываемую при завершении.
-        
-        Пример:
-            def disconnect_db():
-                db.close()
-            
-            app.on_stop(disconnect_db)
-        """
         self._shutdown_hooks.append(func)
 
     def _run_hooks(self, hooks: list[Callable]) -> None:
@@ -202,10 +115,7 @@ class App:
             except Exception as e:
                 print(f"[App] Ошибка в хуке {hook.__name__}: {e}")
 
-    # ─── Конфигурация ─────────────────────────────────────────
-
     def load_config(self, path: str, encoding: str = "utf-8") -> None:
-        """Загрузка конфигурации из JSON файла."""
         if not os.path.exists(path):
             print(f"[App] Ошибка: файл конфигурации не найден: {path}")
             return
@@ -213,25 +123,23 @@ class App:
             self.config = JsonDict(path, encoding)
         except Exception as e:
             print(f"[App] Ошибка при загрузке конфигурации: {e}")
-    
+
     @property
     def config(self) -> dict:
         return self.__config
-    
+
     @config.setter
     def config(self, value):
         prefix = ""
         if isinstance(value, dict):
-            # Настройка папок из конфига
             if value.get("static_folder"):
                 self.flask.static_folder = os.path.join(self.project_root, value["static_folder"])
             if value.get("template_folder"):
                 self.flask.template_folder = os.path.join(self.project_root, value["template_folder"])
-            
-            # Ручные роуты: {"route": "ClassName"}
+
             if value.get("routers") and value.get("routers") != "auto":
                 if value.get("screen_path"):
-                    prefix = value["screen_path"].replace("/", ".") + "."
+                    prefix = value["screen_path"].replace("/", ".").replace("\\", ".") + "."
                 for route, func_name in value["routers"].items():
                     try:
                         cls = getattr(import_module(prefix + func_name), func_name)
@@ -239,100 +147,168 @@ class App:
                     except (ImportError, AttributeError) as e:
                         print(f"[App] Ошибка загрузки экрана '{func_name}': {e}")
 
-            # Авто-роутинг: сканирует ВСЕ Screen-классы во всех файлах
             if value.get("routers") == "auto":
                 self._auto_discover_screens(value.get("screen_path", "screens"))
 
             if value.get("root_path"):
                 self.flask.root_path = value["root_path"]
-                
-            # Авто-поиск сервисов (микросервисов)
-            if value.get("services") == "auto":
-                self._auto_discover_services(value.get("services_path", "services"))
-                
-            for prop, val in value.items():       
+
+            services_path = value.get("services_path", "services")
+            services = value.get("services")
+            if services == "auto":
+                self._auto_discover_services(services_path)
+            elif services:
+                self._load_services(services, services_path)
+
+            for prop, val in value.items():
                 self.__config[prop] = val
-        
+
         elif isinstance(value, JsonDict):
             self.config = value.dictionary
 
-    def _auto_discover_services(self, services_path: str) -> None:
-        """Автоматическое обнаружение и регистрация объектов Service.
-        
-        Ищет все экземпляры класса Service внутри директории `services_path`.
-        """
+    def _normalize_import_prefix(self, base_path: str) -> str:
+        normalized = base_path.replace("/", ".").replace("\\", ".").strip(".")
+        return f"{normalized}." if normalized else ""
+
+    def _iter_service_modules(self, services_dir: str, services_path: str) -> Iterable[str]:
+        prefix = self._normalize_import_prefix(services_path)
+
+        for root, dirs, files in os.walk(services_dir):
+            dirs[:] = [directory for directory in dirs if not directory.startswith("__")]
+
+            relative_root = os.path.relpath(root, services_dir)
+            package_prefix = ""
+            if relative_root != ".":
+                package_prefix = relative_root.replace("/", ".").replace("\\", ".") + "."
+
+            for filename in files:
+                if filename.startswith("__") or not filename.endswith(".py"):
+                    continue
+
+                yield prefix + package_prefix + filename[:-3]
+
+    def _get_service_instances(self, module: Any) -> list[Any]:
         from AEngineApps.service import Service
+
+        return [obj for _, obj in inspect.getmembers(module) if isinstance(obj, Service)]
+
+    def _register_service_instance(self, service: Any, *, auto: bool = False) -> None:
+        try:
+            self.register_service(service)
+            status = "автоматически " if auto else ""
+            print(f"[App] Сервис '{service.name}' (префикс {service.prefix}) {status}зарегистрирован.")
+        except Exception as e:
+            print(f"[App] Ошибка регистрации сервиса '{service.name}': {e}")
+
+    def _load_services(self, services: Any, services_path: str) -> None:
+        """Load services from config.
+
+        Supported shapes:
+        - ["auth", "billing"]
+        - {"auth": "auth_service", "billing": "billing_service"}
+        """
+        prefix = self._normalize_import_prefix(services_path)
+
+        if isinstance(services, (list, tuple, set)):
+            for service_module in services:
+                if not isinstance(service_module, str) or not service_module.strip():
+                    continue
+
+                module_name = service_module if "." in service_module else prefix + service_module
+                try:
+                    module = import_module(module_name)
+                except ImportError as e:
+                    print(f"[App] Ошибка импорта сервиса '{module_name}': {e}")
+                    continue
+
+                services_in_module = self._get_service_instances(module)
+                if not services_in_module:
+                    print(f"[App] В модуле '{module_name}' не найдено экземпляров Service.")
+                    continue
+
+                for service in services_in_module:
+                    self._register_service_instance(service)
+            return
+
+        if isinstance(services, dict):
+            for service_module, service_object in services.items():
+                if not isinstance(service_module, str) or not service_module.strip():
+                    continue
+
+                module_name = service_module if "." in service_module else prefix + service_module
+                try:
+                    module = import_module(module_name)
+                except ImportError as e:
+                    print(f"[App] Ошибка импорта сервиса '{module_name}': {e}")
+                    continue
+
+                if isinstance(service_object, str) and service_object.strip():
+                    service = getattr(module, service_object, None)
+                    if service is None:
+                        print(f"[App] В модуле '{module_name}' не найден объект '{service_object}'.")
+                        continue
+                    self._register_service_instance(service)
+                else:
+                    services_in_module = self._get_service_instances(module)
+                    if not services_in_module:
+                        print(f"[App] В модуле '{module_name}' не найдено экземпляров Service.")
+                        continue
+                    for service in services_in_module:
+                        self._register_service_instance(service)
+            return
+
+        print("[App] Параметр 'services' должен быть 'auto', списком или dict.")
+
+    def _auto_discover_services(self, services_path: str) -> None:
         services_dir = os.path.join(self.project_root, services_path)
-        
+
         if not os.path.isdir(services_dir):
             print(f"[App] Директория сервисов не найдена: {services_dir}")
             return
-            
-        prefix = services_path.replace("/", ".").replace("\\", ".") + "."
-        
-        for filename in os.listdir(services_dir):
-            if filename.startswith("__") or not filename.endswith(".py"):
-                continue
-                
-            mod_name = filename.replace(".py", "")
+
+        for module_name in self._iter_service_modules(services_dir, services_path):
             try:
-                module = import_module(prefix + mod_name)
+                module = import_module(module_name)
             except ImportError as e:
-                print(f"[App] Ошибка импорта сервиса '{mod_name}': {e}")
+                print(f"[App] Ошибка импорта сервиса '{module_name}': {e}")
                 continue
-                
-            # Ищем конкретные экземпляры класса Service в модуле
-            for name, obj in inspect.getmembers(module):
-                if isinstance(obj, Service):
-                    try:
-                        self.register_service(obj)
-                        print(f"[App] Сервис '{obj.name}' (префикс {obj.prefix}) автоматически зарегистрирован.")
-                    except Exception as e:
-                        print(f"[App] Ошибка регистрации сервиса '{obj.name}': {e}")
+
+            for service in self._get_service_instances(module):
+                self._register_service_instance(service, auto=True)
 
     def _auto_discover_screens(self, screen_path: str) -> None:
-        """Автообнаружение ВСЕХ Screen-классов во всех файлах screen_path.
-        
-        Поддерживает несколько экранов в одном файле.
-        Каждый экран должен наследоваться от Screen и иметь атрибут route.
-        """
         screen_dir = os.path.join(self.project_root, screen_path)
         if not os.path.isdir(screen_dir):
             print(f"[App] Директория экранов не найдена: {screen_dir}")
             return
-        
+
         prefix = screen_path.replace("/", ".").replace("\\", ".") + "."
-        
+
         for filename in os.listdir(screen_dir):
             if filename.startswith("__") or not filename.endswith(".py"):
                 continue
-            
-            mod_name = filename.replace(".py", "")
+
+            mod_name = filename[:-3]
             try:
                 module = import_module(prefix + mod_name)
             except ImportError as e:
                 print(f"[App] Ошибка импорта '{mod_name}': {e}")
                 continue
-            
-            # Ищем ВСЕ классы-наследники Screen в модуле
+
             for name, cls in inspect.getmembers(module, inspect.isclass):
                 if not issubclass(cls, Screen) or cls is Screen:
                     continue
                 if not hasattr(cls, "route"):
                     continue
-                
+
                 try:
                     routes = cls.route if isinstance(cls.route, list) else [cls.route]
                     for route in routes:
                         self.add_screen(route, cls)
                 except Exception as e:
                     print(f"[App] Ошибка регистрации экрана '{name}': {e}")
-    
-    # ─── Запуск ───────────────────────────────────────────────
 
     def run(self) -> None:
-        """Запуск приложения."""
-        # Восстанавливаем stdout/stderr в воркерах перед самым стартом HTTP
         if getattr(self, "_original_stdout", None) and sys.stdout != getattr(self, "_original_stdout"):
             sys.stdout.close()
             sys.stdout = self._original_stdout
@@ -348,12 +324,10 @@ class App:
         if not port:
             print("[App] Ошибка: не указан port в конфигурации.")
             return
-        
-        # Дефолтные страницы ошибок (если пользователь не задал свои)
+
         self._register_default_error_handlers()
-        
         self._run_hooks(self._startup_hooks)
-        
+
         try:
             if self.config.get("view") != "web":
                 try:
@@ -367,15 +341,14 @@ class App:
                 self._run_web(host, port)
         finally:
             self._run_hooks(self._shutdown_hooks)
-    
+
     def _run_web(self, host: str, port: int) -> None:
-        """Запуск в web-режиме."""
         role = os.environ.get("AENGINE_CLUSTER_ROLE")
         is_slave = role == "slave"
 
         if is_slave:
-            # Для пассивных нод скрываем логгирование Werkzeug и баннеры Flask
             import logging
+
             logging.getLogger("werkzeug").disabled = True
             cli = sys.modules.get("flask.cli")
             if cli:
@@ -400,8 +373,6 @@ class App:
                 print(f"[App] Ошибка запуска сервера: {e}")
                 print(f"[App] Возможно, порт {port} уже занят.")
 
-
     def close(self) -> None:
-        """Закрывает окно webview."""
         if self.window:
             self.window.destroy()
