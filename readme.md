@@ -20,6 +20,8 @@ project/
 ### 1. `config.json`
 ```json
 {
+    "host": "127.0.0.1",
+    "port": 5000,
     "debug": true,
     "view": "web",
     "screen_path": "screens",
@@ -94,10 +96,9 @@ app.on_start(db.connect)
 | `on_start(func)` | Функция выполнится один раз перед стартом сервера. | `app.on_start(db.connect)` |
 | `on_stop(func)` | Функция выполнится при завершении работы приложения. | `app.on_stop(db.close)` |
 
-### Настройки безопасности и ошибок
+### Настройки ошибок
 | Метод | Описание | Пример |
 |---|---|---|
-| `enable_cors(orig, meth, head)`| Включает CORS. По умолчанию разрешает всё. | `app.enable_cors(origins="*")` |
 | `set_error_page(code, ScreenCls)`| Заменяет стандартную страницу ошибки 404/500 на ваш класс Screen. | `app.set_error_page(404, NotFoundScreen)`|
 
 ### Управление приложением
@@ -146,7 +147,7 @@ class PostScreen(Screen):
 
 ---
 
-## � REST API: класс `API` (api.py)
+## 🔵 REST API: класс `API` (api.py)
 
 Специальная обертка над `Screen` для максимально быстрого и элегантного создания REST API.
 Забудьте про `if request.method == "POST"` и ручной `jsonify`.
@@ -241,7 +242,7 @@ app.register_service(auth)
 
 ## 📙 Документация: `GlobalStorage`
 
-Безопасное глобальное хранилище-одиночка (Singleton). Идеально подходит для обмена данными между модулями, избегая циклических импортов (`Circular Import`).
+Потокобезопасное глобальное хранилище-одиночка (Singleton). Идеально подходит для обмена данными между модулями, избегая циклических импортов (`Circular Import`). Все операции защищены `threading.RLock`.
 
 ```python
 from AEngineApps.global_storage import GlobalStorage
@@ -271,7 +272,7 @@ data = JsonDict("data.json")
 
 | Метод / Синтаксис | Описание | Пример |
 |---|---|---|
-| `data.key = value` | Обновляет значение и ставит отметку об изменении. | `data.port = 8080` |
+| `data.key = value` | Обновляет значение и автоматически сохраняет на диск. | `data.port = 8080` |
 | `data.key` | Чтение значения (выдаст `AttributeError` если нет). | `print(data.port)` |
 | `data.has(key)` | Возвращает `True`, если ключ есть в JSON. | `if data.has("port"):` |
 | `"key" in data` | Аналог `has()`, поддержка оператора `in`. | `if "port" in data:` |
@@ -281,11 +282,29 @@ data = JsonDict("data.json")
 | `data.keys()` | Возвращает список всех ключей. | `for k in data.keys():` |
 | `data.values()` | Возвращает список всех значений. | `for v in data.values():` |
 | `data.items()` | Возвращает пары `(ключ, значение)`. | `for k, v in data.items():` |
-| `data.save()` | Принудительная запись на диск (автовызывается при `load`). | `data.save()` |
+| `data.save()` | Принудительная запись на диск. | `data.save()` |
 | `data.load()` | Принудительная перезагрузка файла с диска (обновляет кэш). | `data.load()` |
 | `data.push(dict)` | Заменяет **ВЕСЬ** файл переданным словарём. | `data.push({"new": "data"})` |
+| `data.batch_update()` | Context manager для пакетного обновления (одна запись на диск). | `with data.batch_update(): ...` |
+
+### Batch-режим (отложенная запись)
+```python
+data = JsonDict("config.json")
+
+# Без batch: 3 записи на диск
+data.host = "0.0.0.0"
+data.port = 8080
+data.debug = True
+
+# С batch: 1 запись на диск
+with data.batch_update():
+    data.host = "0.0.0.0"
+    data.port = 8080
+    data.debug = True
+```
 
 *Особенности `JsonDict` v2.0:*
 - Не падает при отсутствии файла (`FileNotFoundError` обрабатывается, создается пустой словарь).
 - Флаг `ensure_ascii=False` гарантирует корректное отображение русских букв в файле (не в виде `\u0430...`).
 - Ленивое сохранение: данные пишутся на диск только если были реально изменены (флаг `_dirty`).
+- Batch-режим: `batch_update()` позволяет сгруппировать изменения в одну запись.

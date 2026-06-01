@@ -36,13 +36,38 @@ class App:
         self._shutdown_hooks: list[Callable] = []
         self._error_pages: dict[int, Any] = {}
         self.window = None
+        self._devnull_files: list = []
 
         # Suppress duplicate logs in clustered worker processes.
         if os.environ.get("AENGINE_CLUSTER_PORT"):
             self._original_stdout = sys.stdout
-            sys.stdout = open(os.devnull, "w")
+            devnull_out = open(os.devnull, "w")
+            self._devnull_files.append(devnull_out)
+            sys.stdout = devnull_out
+
             self._original_stderr = sys.stderr
-            sys.stderr = open(os.devnull, "w")
+            devnull_err = open(os.devnull, "w")
+            self._devnull_files.append(devnull_err)
+            sys.stderr = devnull_err
+
+    def _close_devnull(self) -> None:
+        """Закрывает все файловые дескрипторы /dev/null и восстанавливает потоки."""
+        if getattr(self, "_original_stdout", None) and sys.stdout != self._original_stdout:
+            sys.stdout = self._original_stdout
+        if getattr(self, "_original_stderr", None) and sys.stderr != self._original_stderr:
+            sys.stderr = self._original_stderr
+
+        for f in getattr(self, "_devnull_files", []):
+            try:
+                if not f.closed:
+                    f.close()
+            except Exception:
+                pass
+        self._devnull_files = []
+
+    def __del__(self) -> None:
+        """Гарантированное закрытие файловых дескрипторов при уничтожении объекта."""
+        self._close_devnull()
 
     def add_screen(self, path: str, screen_cls: type, **options) -> None:
         """Register a screen class under a route."""
@@ -309,12 +334,7 @@ class App:
                     print(f"[App] Ошибка регистрации экрана '{name}': {e}")
 
     def run(self) -> None:
-        if getattr(self, "_original_stdout", None) and sys.stdout != getattr(self, "_original_stdout"):
-            sys.stdout.close()
-            sys.stdout = self._original_stdout
-        if getattr(self, "_original_stderr", None) and sys.stderr != getattr(self, "_original_stderr"):
-            sys.stderr.close()
-            sys.stderr = self._original_stderr
+        self._close_devnull()
 
         host: Optional[str] = self.config.get("host")
         port: Optional[int] = self.config.get("port")

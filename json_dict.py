@@ -3,25 +3,37 @@ JsonDict — JSON-файл как Python-объект с автосохране�
 """
 
 import json
-from typing import Any, Optional
+from contextlib import contextmanager
+from typing import Any, Generator, Optional
 
 
 class JsonDict:
     """Класс для работы с JSON как с объектом.
     
     При изменении атрибутов значения сохраняются в файл.
+    Поддерживает batch-режим для отложенной записи.
     
     Пример:
         data = JsonDict("config.json")
         data.host = "0.0.0.0"       # автоматически сохраняется
         print(data.port)             # читает из файла
         data.save()                  # принудительное сохранение
+        
+        # Batch-режим (одна запись на диск вместо нескольких):
+        with data.batch_update():
+            data.host = "0.0.0.0"
+            data.port = 8080
+            data.debug = True
+        # Данные записываются на диск один раз при выходе из блока
     """
+
+    _INTERNAL_ATTRS = frozenset({"dictionary", "path", "encoding", "_dirty", "_batch_mode"})
 
     def __init__(self, path: str, encoding: str = "utf-8"):
         self.path: str = path
         self.encoding: str = encoding
         self._dirty: bool = False
+        self._batch_mode: bool = False
         self.dictionary: dict = self.load()
 
     def __getitem__(self, item: str) -> Any:
@@ -31,19 +43,38 @@ class JsonDict:
         self.__setattr__(key, value)
 
     def __setattr__(self, key: str, value: Any) -> None:
-        if "dictionary" in self.__dict__:
-            if key not in ("dictionary", "path", "encoding", "_dirty"):
-                self.dictionary[key] = value
-                self._dirty = True
-                self._auto_save()
+        if "dictionary" in self.__dict__ and key not in self._INTERNAL_ATTRS:
+            self.dictionary[key] = value
+            self._dirty = True
+            if not self._batch_mode:
+                self._flush()
         self.__dict__[key] = value
-    
-    def _auto_save(self) -> None:
-        """Сохраняет изменения в файл."""
+
+    def _flush(self) -> None:
+        """Записывает изменения на диск, если есть несохранённые данные."""
         if self._dirty:
             self.push(self.dictionary)
             self._dirty = False
-    
+
+    @contextmanager
+    def batch_update(self) -> Generator[None, None, None]:
+        """Context manager для пакетного обновления.
+        
+        Откладывает запись на диск до выхода из блока with.
+        
+        Пример:
+            with data.batch_update():
+                data.host = "0.0.0.0"
+                data.port = 8080
+            # Одна запись на диск
+        """
+        self._batch_mode = True
+        try:
+            yield
+        finally:
+            self._batch_mode = False
+            self._flush()
+
     def keys(self) -> list[str]:
         """Возвращает список ключей."""
         return list(self.dictionary.keys())
